@@ -1,19 +1,69 @@
 package gov.nasa.jpf.contcheck;
 
+import java.util.Iterator;
+
 import gov.nasa.jpf.*;
 import gov.nasa.jpf.jvm.bytecode.NEW;
 import gov.nasa.jpf.report.PublisherExtension;
+import gov.nasa.jpf.vm.ElementInfo;
+import gov.nasa.jpf.vm.Heap;
 import gov.nasa.jpf.vm.Instruction;
+import gov.nasa.jpf.vm.StateSet;
 import gov.nasa.jpf.vm.ThreadInfo;
 import gov.nasa.jpf.vm.VM;
 
 public class ContChkListener extends PropertyListenerAdapter implements PublisherExtension {
-    public ContChkListener(Config conf, JPF jpf) {
-        //jpf.addPublisherExtension(ConsolePublisher.class,this);
+    
+	public ContChkListener() {	
     }
-    public void instructionExecuted(VM vm, ThreadInfo currentThread, Instruction nextInstruction, Instruction executedInstruction) {
+	
+	public ContChkListener(Config conf, JPF jpf) {
+        //jpf.addPublisherExtension(ConsolePublisher.class,this);
+    	System.out.println("constuctor of contcheck");
+    }
+    @SuppressWarnings("deprecation")
+	public void instructionExecuted(VM vm, ThreadInfo currentThread, Instruction nextInstruction, Instruction executedInstruction) {
     	if (!vm.getSystemState().isIgnored()) {
+    		System.out.println("instructionExecuted fired");
 			Instruction insn = executedInstruction;
+			System.out.println("instruction: "+insn.toString());
+			System.out.println("source line: "+insn.getSourceLine());
+			System.out.println("line #: "+insn.getLineNumber());
+			System.out.println("method name: "+insn.getMethodInfo().toString());
+			if(insn.hasAttr()) {
+				Iterator it = insn.attrIterator();
+				while(it.hasNext()) {
+					Object o = it.next();
+					String str = o.toString();
+				}
+				
+			}
+			Object attrs = insn.getAttr();
+			String methname = insn.getMethodInfo().getName();
+			System.out.println("methodname: "+methname);
+			if(insn.getMethodInfo().hasTypeAnnotatedLocalVars()) {
+				String[] varnames = insn.getMethodInfo().getLocalVariableNames();
+				if(varnames.length > 0) {
+					for(String vn : varnames) {
+						System.out.println("varname: "+vn);
+					}
+				}
+			}
+			StateSet ss = vm.getStateSet();
+			Heap h = vm.getCurrentThread().getHeap();
+			Iterator<ElementInfo> iter = h.iterator();
+			while(iter.hasNext()) {
+				ElementInfo ei = iter.next();
+				int ei_idx = ei.getObjectRef();
+			}
+			if(attrs != null) {
+				System.out.println("attrs "+attrs.toString());
+			}
+			
+			boolean schedrel = insn.isSchedulingRelevant(vm.getSystemState(), vm.getKernelState(), vm.getCurrentThread());
+			if(schedrel) {
+				System.out.println("IS scheduling relevant");
+			}
 			ThreadInfo ti = currentThread;
 			Config conf = vm.getConfig();
 			if(insn instanceof NEW) {
