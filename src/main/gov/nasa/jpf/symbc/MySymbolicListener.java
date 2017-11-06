@@ -79,11 +79,13 @@ public class MySymbolicListener extends PropertyListenerAdapter implements Publi
 	
 
 	private Map<String,MethodSummary> allSummaries;
+	private java.util.Stack<MyTraceData> stackSummary;
     private String currentMethodName = "";
 
 	public MySymbolicListener(Config conf, JPF jpf) {
 		jpf.addPublisherExtension(ConsolePublisher.class, this);
 		allSummaries = new HashMap<String, MethodSummary>();
+		stackSummary = new java.util.Stack<MyTraceData>();
 	}
 
 	//Writes the method summaries to a file for use in another application
@@ -267,6 +269,8 @@ public class MySymbolicListener extends PropertyListenerAdapter implements Publi
 
 					currentMethodName = longName;
 					allSummaries.put(longName,methodSummary);
+					MyTraceData mtd = new MyTraceData(ti, longName, methodSummary);
+					stackSummary.push(mtd);
 				}
 			}else if (insn instanceof JVMReturnInstruction){
 				MethodInfo mi = insn.getMethodInfo();
@@ -688,5 +692,37 @@ public class MySymbolicListener extends PropertyListenerAdapter implements Publi
 				return this.pathConditions;
 			}
 
+	  }
+	  protected class MyTraceData {
+		  private ThreadInfo it;
+		  private String methodName;
+		  private MethodSummary summary;
+		  
+		  public MyTraceData() {
+			  
+		  }
+		  public MyTraceData(ThreadInfo t, String name, MethodSummary ms) {
+			  this.it = t;
+			  this.methodName = name;
+			  this.summary = ms;
+		  }
+		  public void setTI(ThreadInfo t) {
+			  this.it = t;
+		  }
+		  public void setName(String name) {
+			  this.methodName = name;
+		  }
+		  public void setSummary(MethodSummary m) {
+			  this.summary = m;
+		  }
+		  public ThreadInfo getTI() {
+			  return this.it;
+		  }
+		  public String getName() {
+			  return this.methodName;
+		  }
+		  public MethodSummary getMS() {
+			  return this.summary;
+		  }
 	  }
 }
