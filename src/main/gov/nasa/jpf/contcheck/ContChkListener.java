@@ -3,9 +3,12 @@ package gov.nasa.jpf.contcheck;
 import java.util.Iterator;
 
 import gov.nasa.jpf.*;
+import gov.nasa.jpf.jvm.bytecode.JVMFieldInstruction;
 import gov.nasa.jpf.jvm.bytecode.NEW;
 import gov.nasa.jpf.report.PublisherExtension;
+import gov.nasa.jpf.vm.ClassInfo;
 import gov.nasa.jpf.vm.ElementInfo;
+import gov.nasa.jpf.vm.FieldInfo;
 import gov.nasa.jpf.vm.Heap;
 import gov.nasa.jpf.vm.Instruction;
 import gov.nasa.jpf.vm.StateSet;
@@ -49,13 +52,32 @@ public class ContChkListener extends PropertyListenerAdapter implements Publishe
 					}
 				}
 			}
+			ClassInfo lci = currentThread.getExecutingClassInfo();
+			try {
+				FieldInfo[] fi = lci.getDeclaredStaticFields();
+				if(fi != null) {
+					for(int i = 0; i < fi.length; i++) {
+						FieldInfo tfi = fi[i];
+						String tfi_type = tfi.getType();
+						System.out.println("field "+i+" "+tfi_type);
+					}
+				}
+			} catch (NullPointerException npe) {
+				System.out.println("npe on getDeclaredStaticFields");
+			}
 			StateSet ss = vm.getStateSet();
 			Heap h = vm.getCurrentThread().getHeap();
 			Iterator<ElementInfo> iter = h.iterator();
-			while(iter.hasNext()) {
-				ElementInfo ei = iter.next();
-				int ei_idx = ei.getObjectRef();
-			}
+			int elem_cnt = h.size();
+			System.out.println("heap size "+elem_cnt);
+			//while(iter.hasNext()) {
+			//	ElementInfo ei = iter.next();
+				
+				//int ei_idx = ei.getObjectRef();
+				//System.out.println("heap element idx "+ei_idx);
+				//Class clazz = ei.getClass();
+				//System.out.println("classname: "+clazz.getName());
+			//}
 			if(attrs != null) {
 				System.out.println("attrs "+attrs.toString());
 			}
@@ -73,6 +95,9 @@ public class ContChkListener extends PropertyListenerAdapter implements Publishe
 				if(cl.isArray()) {
 					System.out.println("class "+cname+" is an array class");
 				}
+			}
+			else if(insn instanceof JVMFieldInstruction) {
+				System.out.println("JVMFieldInstruction type");
 			}
     	}
     }
