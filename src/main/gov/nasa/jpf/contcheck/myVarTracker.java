@@ -21,10 +21,14 @@ import gov.nasa.jpf.Config;
 import gov.nasa.jpf.JPF;
 import gov.nasa.jpf.ListenerAdapter;
 import gov.nasa.jpf.jvm.bytecode.ALOAD;
+import gov.nasa.jpf.jvm.bytecode.ASTORE;
 import gov.nasa.jpf.jvm.bytecode.ArrayStoreInstruction;
+import gov.nasa.jpf.jvm.bytecode.ISTORE;
 import gov.nasa.jpf.jvm.bytecode.JVMFieldInstruction;
 import gov.nasa.jpf.jvm.bytecode.GETFIELD;
 import gov.nasa.jpf.jvm.bytecode.GETSTATIC;
+import gov.nasa.jpf.vm.bytecode.ArrayElementInstruction;
+import gov.nasa.jpf.vm.bytecode.InvokeInstruction;
 import gov.nasa.jpf.vm.bytecode.ReadInstruction;
 import gov.nasa.jpf.vm.bytecode.StoreInstruction;
 import gov.nasa.jpf.vm.bytecode.LocalVariableInstruction;
@@ -74,6 +78,8 @@ public class myVarTracker extends ListenerAdapter {
   HashMap<String, VarStat> stat = new HashMap<String, VarStat>();
   int nStates = 0;
   int maxDepth;
+  String target_container;
+  boolean inSearch, inMethod;
 
 
   public myVarTracker (Config config, JPF jpf){
@@ -83,10 +89,12 @@ public class myVarTracker extends ListenerAdapter {
             new String[] {"java.*", "javax.*"} ));
 
     maxVars = config.getInt("vt.max_vars", 25);
-
+    target_container = config.getString("contarget");
     methodSpec = MethodSpec.createMethodSpec(config.getString("vt.methods", "!java.*.*"));
 
     jpf.addPublisherExtension(ConsolePublisher.class, this);
+    this.inSearch = false;
+    this.inMethod = false;
   }
 
   @Override
@@ -161,13 +169,30 @@ public class myVarTracker extends ListenerAdapter {
 
     queue.clear();
   }
+  
+  @Override
+  public void searchStarted(Search search) {
+	  this.inSearch = true;
+  }
 
   // <2do> - general purpose listeners should not use types such as String for storing
   // attributes, there is no good way to make sure you retrieve your own attributes
   @Override
   public void instructionExecuted(VM vm, ThreadInfo ti, Instruction nextInsn, Instruction executedInsn) {
     String varId;
-
+    //String insn_text = executedInsn.toString();
+    //if(insn_text.contains("PUT")) {
+    //	System.out.println("PUT insn: "+insn_text);
+    //}
+    if(executedInsn instanceof InvokeInstruction) {
+    	if(((InvokeInstruction)executedInsn).isFirstInstruction()) {
+    		if(ti.getApplicationContext().getMainClassName().equals(((InvokeInstruction)executedInsn).getInvokedMethodClassName())) {
+    			System.out.println("invokeInsn: "+
+    		  ((InvokeInstruction) executedInsn).getInvokedMethodClassName());
+    			this.inMethod = true;
+    		}
+    	}
+    }
     if (executedInsn instanceof ALOAD) {
       // a little extra work - we need to keep track of variable names, because
       // we cannot easily retrieve them in a subsequent xASTORE, which follows
@@ -184,15 +209,22 @@ public class myVarTracker extends ListenerAdapter {
           // subsequent xASTOREs)
           frame = ti.getModifiableTopFrame();
           frame.addOperandAttr(varId);
+          if(inMethod && (inSearch || varId.contains(this.target_container))) {
+        	  System.out.println("ALOAD_Instr: "+
+                  ((LocalVariableInstruction) executedInsn).getMnemonic()+" "+varId);
+          }
         }
       }
-
-    } else if ((executedInsn instanceof ReadInstruction) && ((JVMFieldInstruction)executedInsn).isReferenceField()){
+    }
+    else if ((executedInsn instanceof ReadInstruction) && ((JVMFieldInstruction)executedInsn).isReferenceField()){
       varId = ((JVMFieldInstruction)executedInsn).getFieldName();
-
+      String varClass = ((JVMFieldInstruction)executedInsn).getFieldInfo().getSignature();
       StackFrame frame = ti.getModifiableTopFrame();
       frame.addOperandAttr(varId);
-
+      if(inMethod && (inSearch || varId.contains(this.target_container))) {
+    	  System.out.println("ReadInstr: "+
+              executedInsn.getMnemonic()+" "+varId+"; line: "+executedInsn.getLineNumber());
+      }
 
     // here come the changes - note that we can't update the stats right away,
     // because we don't know yet if the state this leads into has already been
@@ -214,9 +246,25 @@ public class myVarTracker extends ListenerAdapter {
         varId = ((LocalVariableInstruction)executedInsn).getVariableId();
       }
       queueIfRelevant(ti, executedInsn, varId);
-
+      if(inMethod && (inSearch || varId.contains(this.target_container))) {
+    	  if(executedInsn instanceof ASTORE) {
+    		  System.out.println("AstoreInsn: "+((ASTORE)executedInsn).getBaseMnemonic()+
+    			" "+((ASTORE)executedInsn).getLocalVariableName()+" "+varId);
+    	  } 
+    	  else if(executedInsn instanceof ISTORE) {
+    		  System.out.println("IstoreInsn: "+((ISTORE)executedInsn).getBaseMnemonic()+
+    		      " "+((ISTORE)executedInsn).getLocalVariableName()+" "+varId);
+    	  }
+    	  else {
+    	    System.out.println("ArrayStoreInstr: "+
+              ((ArrayStoreInstruction)executedInsn).getMnemonic()+" "+varId);
+    	  }
+      }
     } else if (executedInsn instanceof WriteInstruction){
       varId = ((WriteInstruction) executedInsn).getFieldInfo().getFullName();
+      if(inMethod && (inSearch || varId.contains(this.target_container))) {
+          System.out.println("WriteInsn: "+((WriteInstruction) executedInsn).getMnemonic()+" "+varId);
+      }
       queueIfRelevant(ti, executedInsn, varId);
     }
   }
@@ -255,7 +303,8 @@ public class myVarTracker extends ListenerAdapter {
 class VarStat implements Comparable<VarStat> {
   String id;               // class[@objRef].field || class[@objref].method.local
   int nChanges;
-  
+  int nElements;
+  int currSize;
   int lastState;           // this was changed in (<2do> don't think we need this)
   
   // might have more info in the future, e.g. total number of changes vs.
@@ -264,8 +313,15 @@ class VarStat implements Comparable<VarStat> {
   VarStat (String varId, int stateId) {
     id = varId;
     nChanges = 1;
-    
+    nElements = 0;
     lastState = stateId;
+  }
+  
+  void incElements() {
+	  nElements++;
+  }
+  void decElements() {
+	  nElements--;
   }
   
   int getChangeCount () {
