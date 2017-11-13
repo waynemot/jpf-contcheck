@@ -260,7 +260,7 @@ public class MySymbolicListener extends PropertyListenerAdapter implements Publi
 							sfIndex++;
 
 					}
-
+					int inc = numberOfArgs > 0 ? 1:-1; // set increment of stack count
 					// get rid of last ","
 					if (symValuesStr.endsWith(",")) {
 						symValuesStr = symValuesStr.substring(0,symValuesStr.length()-1);
@@ -269,7 +269,8 @@ public class MySymbolicListener extends PropertyListenerAdapter implements Publi
 
 					currentMethodName = longName;
 					allSummaries.put(longName,methodSummary);
-					MyTraceData mtd = new MyTraceData(ti, longName, methodSummary);
+					
+					MyTraceData mtd = new MyTraceData(ti.getId()+":"+ti.getName()+":"+ti.getLine(), longName, methodSummary, inc);
 					stackSummary.push(mtd);
 				}
 			}else if (insn instanceof JVMReturnInstruction){
@@ -425,6 +426,16 @@ public class MySymbolicListener extends PropertyListenerAdapter implements Publi
 							}
 						}
 					}
+				}
+			}
+			if(!stackSummary.isEmpty()) {
+				int idx;
+				int stackcount = 0;
+				for(idx = 0; idx < stackSummary.size(); idx++) {
+					stackcount += stackSummary.get(idx).getIncrement();
+				}
+				if(stackcount < 0) {
+					System.out.println("VIOLATION, CONTAINER READ ON EMPTY OBJECT");
 				}
 			}
 		}
@@ -694,20 +705,22 @@ public class MySymbolicListener extends PropertyListenerAdapter implements Publi
 
 	  }
 	  protected class MyTraceData {
-		  private ThreadInfo it;
+		  private String threadName;
 		  private String methodName;
 		  private MethodSummary summary;
+		  private int increment;
 		  
 		  public MyTraceData() {
 			  
 		  }
-		  public MyTraceData(ThreadInfo t, String name, MethodSummary ms) {
-			  this.it = t;
+		  public MyTraceData(String tname, String name, MethodSummary ms, int inc) {
+			  this.threadName = tname;
 			  this.methodName = name;
 			  this.summary = ms;
+			  this.increment = inc;
 		  }
-		  public void setTI(ThreadInfo t) {
-			  this.it = t;
+		  public void setTI(String t) {
+			  this.threadName = t;
 		  }
 		  public void setName(String name) {
 			  this.methodName = name;
@@ -715,14 +728,20 @@ public class MySymbolicListener extends PropertyListenerAdapter implements Publi
 		  public void setSummary(MethodSummary m) {
 			  this.summary = m;
 		  }
-		  public ThreadInfo getTI() {
-			  return this.it;
+		  public void setIncrement(int inc) {
+			  this.increment = inc;
+		  }
+		  public String getTI() {
+			  return this.threadName;
 		  }
 		  public String getName() {
 			  return this.methodName;
 		  }
 		  public MethodSummary getMS() {
 			  return this.summary;
+		  }
+		  public int getIncrement() {
+			  return this.increment;
 		  }
 	  }
 }
