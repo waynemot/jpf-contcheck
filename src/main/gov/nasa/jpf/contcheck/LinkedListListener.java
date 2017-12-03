@@ -16,7 +16,7 @@ import gov.nasa.jpf.jvm.bytecode.JVMReturnInstruction;
 import gov.nasa.jpf.jvm.bytecode.LRETURN;
 import gov.nasa.jpf.report.ConsolePublisher;
 import gov.nasa.jpf.symbc.SymbolicInstructionFactory;
-import gov.nasa.jpf.symbc.MySymbolicListener.MyTraceData;
+//import gov.nasa.jpf.symbc.MySymbolicListener.MyTraceData;
 import gov.nasa.jpf.symbc.bytecode.BytecodeUtils;
 import gov.nasa.jpf.symbc.bytecode.INVOKESTATIC;
 import gov.nasa.jpf.symbc.concolic.PCAnalyzer;
@@ -50,6 +50,7 @@ public class LinkedListListener extends ListenerAdapter {
 	private java.util.Stack<MyTraceData> stackSummary;
     private String currentMethodName = "";
     private String target_container;
+    private String container_name;
     private String read_method;
     private String write_method;
     private int inc;
@@ -59,6 +60,7 @@ public class LinkedListListener extends ListenerAdapter {
 		allSummaries = new HashMap<String, MethodSummary>();
 		stackSummary = new java.util.Stack<MyTraceData>();
 		target_container = conf.getString("contarget");
+		container_name = conf.getString("conname");
 		read_method = conf.getString("rmethod");
 		write_method = conf.getString("wmethod");
 		this.inc = 0;
@@ -83,7 +85,7 @@ public class LinkedListListener extends ListenerAdapter {
 				System.out.println(tid+" InvokeInsn: "+md.getInvokedMethodClassName()+" "+methodName);
 				MyTraceData mtd = new MyTraceData(ti.getId()+":"+ti.getName()+":"+ti.getLine(), null, null, this.inc);
 				stackSummary.push(mtd);
-				}
+				//}
 			} else if (insn instanceof JVMReturnInstruction){
 				MethodInfo mi = insn.getMethodInfo();
 				ClassInfo ci = mi.getClassInfo();
@@ -93,7 +95,7 @@ public class LinkedListListener extends ListenerAdapter {
 					String longName = mi.getLongName();
 					int numberOfArgs = mi.getNumberOfArguments();
 					
-					if (((BytecodeUtils.isClassSymbolic(config, className, mi, methodName))
+					if (((BytecodeUtils.isClassSymbolic(conf, className, mi, methodName))
 							|| BytecodeUtils.isMethodSymbolic(conf, mi.getFullName(), numberOfArgs, null))){
 					
 						ChoiceGenerator <?>cg = vm.getChoiceGenerator();

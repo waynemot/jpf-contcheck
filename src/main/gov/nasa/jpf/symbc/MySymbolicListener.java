@@ -704,7 +704,7 @@ public class MySymbolicListener extends PropertyListenerAdapter implements Publi
 			}
 
 	  }
-	  protected class MyTraceData {
+	  public class MyTraceData {
 		  private String threadName;
 		  private String methodName;
 		  private MethodSummary summary;
